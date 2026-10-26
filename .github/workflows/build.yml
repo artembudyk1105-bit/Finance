@@ -53,4 +53,4 @@ jobs:
         run: |
           gh release delete latest -y --cleanup-tag || true
           gh release create latest Finance.ipa --title "Финансы — последняя сборка" \
-            --notes "Скачайте Finance.ipa и установите через Sideloadly или AltStore (инструкция в README). Сборка: ${GITHUB_SHA::7}"
+            --notes "Скачайте Finance.ipa и установите через SideStore, AltStore или Sideloadly (инструкция в README). Сборка: ${GITHUB_SHA::7}"
