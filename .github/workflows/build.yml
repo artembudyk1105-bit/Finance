@@ -1,0 +1,56 @@
+name: Сборка iOS
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Генерация проекта
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Сборка (без подписи)
+        run: |
+          set -o pipefail
+          xcodebuild -project Finance.xcodeproj -scheme Finance -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | grep -E "error:|warning: .*(deprecated|unused)|BUILD (SUCCEEDED|FAILED)|\*\*" || true
+          test -d build/Build/Products/Release-iphoneos/Finance.app
+
+      - name: Упаковка .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Finance.app Payload/
+          zip -qry Finance.ipa Payload
+          ls -lh Finance.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Finance-ipa
+          path: Finance.ipa
+
+      - name: Публикация в Releases
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest Finance.ipa --title "Финансы — последняя сборка" \
+            --notes "Скачайте Finance.ipa и установите через Sideloadly или AltStore (инструкция в README). Сборка: ${GITHUB_SHA::7}"
